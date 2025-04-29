@@ -12,9 +12,16 @@ client = OpenAI(
 )
 
 # Streamlit 기본 설정
-st.set_page_config(page_title="🧠 나만의 챗봇 (스트리밍)", page_icon="💬")
-st.title("🧠 나만의 Groq Streaming 챗봇")
-st.caption("Streamlit + Groq API(streaming)")
+st.set_page_config(page_title="🧠 김현수 챗봇 갖다붙이기 연습용", page_icon="💬")
+st.title("🧠 Gemma2-9B-it 모델 API 챗봇")
+st.markdown("""
+# 👋 환영합니다!
+이곳은 챗봇 서비스입니다.  
+아래 입력창에 질문을 입력해보세요!
+현수에 대해 물어봐도 몰라요
+한국어가 서툴러서 오타가 많습니다.
+""")
+st.caption("김현수 물어봐도 모름 / 한국어 서툼")
 
 # 세션 상태로 대화 기록 관리
 if "messages" not in st.session_state:
