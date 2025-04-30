@@ -56,39 +56,6 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# ✅ 하단 이동 버튼 (입력창 위에 배치)
-if st.button("⬇️ 최신 메시지로 이동"):
-    st.markdown("""
-    <style>
-    #scroll-button {
-        position: fixed;
-        bottom: 100px; /* 채팅 입력창 위에 띄우기 */
-        right: 30px;
-        z-index: 9999;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 8px;
-        font-size: 14px;
-        cursor: pointer;
-    }
-    </style>
-
-    <button id="scroll-button" onclick="scrollToBottom()">⬇️ 최신 메시지</button>
-
-    <script>
-    function scrollToBottom() {
-        const chatContainer = window.parent.document.querySelector('.element-container');
-        if (chatContainer) {
-            chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
-        }
-    }
-    </script>
-    """, unsafe_allow_html=True
-    )
-
-
 # 사용자 입력 받기
 user_input = st.chat_input("메시지를 입력하세요.")
 
