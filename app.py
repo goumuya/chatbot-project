@@ -18,14 +18,38 @@ st.markdown("""
 # 👋 환영합니다!
 이곳은 챗봇 서비스입니다. \n
 아래 입력창에 질문을 입력해보세요!\n
-현수에 대해 물어봐도 몰라요\n
 한국어가 서툴러서 오타 혹은 갑작스런 언어변경이 종종 발생합니다.
 """)
 st.caption("김현수 물어봐도 모름 / 한국어 서툼")
 
-# 세션 상태로 대화 기록 관리
+# ▶ 성격 프롬프트 사전
+system_prompts = {
+    "Sweetie": "You are an AI who always talks to people in a kind and gentle way. and You must answer in Korean.",
+    "Lover" : "You are an AI who always communicates with people in a sweet and loving way. Please answer in a comfortable but loving way as much as you can to your lover. and You must answer in Korean",
+    "Strictly": "You're an AI that only responds to you with a firm, strict tone. and You must answer in Korean.",
+    "twisted": "You're an AI who only talks in a grumpy, grumpy tone. You reply in a slightly upset tone. Instead, and You must answer in Korean.",
+    "Ignore": "You're an AI who talks in a chilly, hateful way for some reason. You respond in a slightly angry way. and You must answer in Korean."
+}
+
+# 세션 초기화
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "personality" not in st.session_state:
+    st.session_state.personality = None
+
+# ▶ 성격 선택 화면 (초기 1회)
+if st.session_state.personality is None:
+    st.subheader("🤖 AI 성격을 골라주세요!")
+    selected = st.radio("원하는 성격을 선택하세요:", ["Sweetie", "Lover", "Strictly", "twisted", "Ignore"])
+    if st.button("선택 완료"):
+        st.session_state.personality = selected
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": f"안녕하세요! {selected}한 AI입니다. 무엇을 도와드릴까요?"
+        })
+        st.rerun()
+    st.stop()
 
 # 대화 기록 출력
 for message in st.session_state.messages:
@@ -49,9 +73,10 @@ if user_input:
     # 스트리밍 응답 받기
     response = client.chat.completions.create(
         #model = "gpt-4o",
+        #model = "gpt-3.5-turbo",
         #model = "llama3-70b-8192", # Groq 모델
         model = "gemma2-9b-it",
-        messages=st.session_state.messages,
+        messages=[{"role": "system", "content": system_prompts[st.session_state.personality]}] + st.session_state.messages,
         stream=True # 스트리밍 활성화
     )
 
