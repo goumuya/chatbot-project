@@ -56,6 +56,19 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+# ✅ 하단 이동 버튼 (입력창 위에 배치)
+if st.button("⬇️ 최신 메시지로 이동"):
+    st.markdown(
+        """
+        <script>
+        const elements = window.parent.document.querySelectorAll('.element-container');
+        const last = elements[elements.length - 1];
+        if (last) last.scrollIntoView({behavior: 'smooth'});
+        </script>
+        """,
+        unsafe_allow_html=True
+    )
+
 # 사용자 입력 받기
 user_input = st.chat_input("메시지를 입력하세요.")
 
