@@ -67,6 +67,10 @@ if selected != st.session_state.personality:
         "content": f"성격이 {selected}으로 바뀌었습니다."
     })
 
+# 대화 리셋 버튼
+if st.button("💬 대화 리셋"):
+    st.session_state.messages = []
+    st.rerun()
 
 
 # 대화 기록 출력
