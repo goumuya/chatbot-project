@@ -12,10 +12,7 @@ import av
 load_dotenv()
 
 client = OpenAI(
-    #api_key=os.getenv("GROQ_API_KEY"),
-    #api_key=os.getenv("OPENAI_PAID_API_KEY"),
-    api_key=st.secrets["OPENAI_PAID_API_KEY"],
-    #base_url="https://api.groq.com/openai/v1"
+    api_key=st.secrets["OPENAI_PAID_API_KEY"]
 )
 
 # 마이크 처리 클래스
@@ -33,10 +30,9 @@ st.set_page_config(page_title="🧠 말동무 챗봇 연습용", page_icon="💬
 st.title("🧠 심심풀이 말동무 챗봇")
 st.markdown("""
 # 👋 환영합니다!
-이곳은 말동무 챗봇 서비스입니다. \n
-성격을 고르고, 아래 입력창에서 간단한 수다를 즐겨보세요!\n
+이곳은 말동무 챗봇 서비스입니다. 
+성격을 고르고, 아래 입력창에서 간단한 수다를 즐겨보세요!
 """)
-#st.caption("김현수 물어봐도 모름 / 한국어 서툼")
 st.caption("김현수 물어봐도 모릅니다.ㅠ")
 
 # ▶ 성격 프롬프트 사전
@@ -51,22 +47,10 @@ system_prompts = {
 # 세션 초기화
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 if "personality" not in st.session_state:
     st.session_state.personality = "Sweetie"
-
-# ▶ 성격 선택 화면 (초기 1회)
-# if st.session_state.personality is None:
-#     st.subheader("🤖 AI 성격을 골라주세요!")
-#     selected = st.radio("원하는 성격을 선택하세요:", ["Sweetie", "Lover", "Strictly", "twisted", "Ignore"])
-#     if st.button("선택 완료"):
-#         st.session_state.personality = selected
-#         st.session_state.messages.append({
-#             "role": "assistant",
-#             "content": f"안녕하세요! {selected}한 AI입니다. 무엇을 도와드릴까요?"
-#         })
-#         st.rerun()
-#     st.stop()
+if "mic_on" not in st.session_state:
+    st.session_state.mic_on = False
 
 # 드롭다운으로 성격 선택 가능하게
 personality_list = list(system_prompts.keys())
@@ -75,10 +59,11 @@ with st.sidebar:
     st.markdown("## 🤖 AI 성격 설정")
     selected = st.selectbox("현재 성격을 선택하세요", personality_list,
                             index=personality_list.index(st.session_state.personality))
-# selected = st.selectbox("🤖 현재 AI 성격 : ", personality_list, 
-#                         index=personality_list.index(st.session_state.personality))
+    if st.button("💬 대화 리셋"):
+        st.session_state.messages = []
+        st.rerun()
 
-#성격 변경 감지
+# 성격 변경 감지
 if selected != st.session_state.personality:
     st.session_state.personality = selected
     st.session_state.messages.append({
@@ -86,80 +71,71 @@ if selected != st.session_state.personality:
         "content": f"성격이 {selected}으로 바뀌었습니다."
     })
 
-# 대화 리셋 버튼
-if st.button("💬 대화 리셋"):
-    st.session_state.messages = []
-    st.rerun()
-
-
 # 대화 기록 출력
-# for message in st.session_state.messages:
-#     with st.chat_message(message["role"]):
-#         st.markdown(message["content"])
 for message in st.session_state.messages:
     if "role" in message and "content" in message:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-# 🎤 실시간 마이크 입력
-st.markdown("## 🎤 또는 마이크로 말해보세요")
-ctx = webrtc_streamer(
-    key="speech",
-    audio_processor_factory=AudioProcessor,
-    media_stream_constraints={"audio": True, "video": False},
-    async_processing=True,
-)
+# 🎤 마이크 on/off 토글 및 표시
+st.markdown("## 🎤 마이크 입력")
+st.session_state.mic_on = st.toggle("🎙 마이크 켜기 / 끄기", value=st.session_state.mic_on)
 
-user_input = None
-if ctx.audio_processor and st.button("📝 말한 내용으로 질문하기"):
-    audio_data = np.concatenate(ctx.audio_processor.recorded_frames)
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmpfile:
-        sf.write(tmpfile.name, audio_data, 48000)
-        with open(tmpfile.name, "rb") as f:
-            transcript = client.audio.transcriptions.create(
-                model="whisper-1",
-                file=f,
-                language="ko"
-            )
-            user_input = transcript.text
-            st.chat_message("user").markdown(user_input)
-            st.session_state.messages.append({"role": "user", "content": user_input})            
+if st.session_state.mic_on:
+    st.success("🔴 마이크가 켜졌습니다. 말을 시작하세요.")
+    ctx = webrtc_streamer(
+        key="speech",
+        audio_processor_factory=AudioProcessor,
+        media_stream_constraints={"audio": True, "video": False},
+        async_processing=True,
+    )
+
+    if ctx.audio_processor and st.button("📝 말한 내용으로 질문하기"):
+        audio_data = np.concatenate(ctx.audio_processor.recorded_frames)
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmpfile:
+            sf.write(tmpfile.name, audio_data, 48000)
+            with open(tmpfile.name, "rb") as f:
+                transcript = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=f,
+                    language="ko"
+                )
+                user_input = transcript.text
+                st.chat_message("user").markdown(user_input)
+                st.session_state.messages.append({"role": "user", "content": user_input})
+else:
+    ctx = None
 
 # 사용자 입력 받기
-user_input = st.chat_input("메시지를 입력하세요.")
-
-if user_input:
-    # 유저 메시지 화면에 표시
+text_input = st.chat_input("메시지를 입력하세요.")
+if text_input:
+    user_input = text_input
     st.chat_message("user").markdown(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
+else:
+    user_input = None
 
-    # 빈 챗 메시지를 미리 생성 (스트리밍 중 실시간 업데이트 용)
+# GPT 응답 생성
+if user_input:
     assistant_message = st.chat_message("assistant")
     assistant_response = assistant_message.empty()
-
     full_reply = ""
 
-    #필터링 된 메시지만 따로 만들어서 사용
     valid_messages = [
         msg for msg in st.session_state.messages
         if isinstance(msg, dict) and "role" in msg and "content" in msg
     ]
 
-    # 스트리밍 응답 받기
     response = client.chat.completions.create(
         model = "gpt-4o",
-        #model = "gpt-3.5-turbo",
-        #model = "llama3-70b-8192", # Groq 모델
-        #model = "gemma2-9b-it",
-        messages=[{"role": "system", "content": system_prompts[st.session_state.personality]}] + st.session_state.messages,
-        stream=True # 스트리밍 활성화
+        messages=[{"role": "system", "content": system_prompts[st.session_state.personality]}] + valid_messages,
+        stream=True
     )
 
     for chunk in response:
         if chunk.choices[0].delta.content:
             full_reply += chunk.choices[0].delta.content
-            assistant_response.markdown(full_reply + "▌") # 커서 느낌
+            assistant_response.markdown(full_reply + "▌")
 
-    # 스트리밍 끝난 후 최종 메시지 표시
     assistant_response.markdown(full_reply)
     st.session_state.messages.append({"role": "assistant", "content": full_reply})
