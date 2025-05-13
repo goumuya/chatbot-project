@@ -38,20 +38,36 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "personality" not in st.session_state:
-    st.session_state.personality = None
+    st.session_state.personality = "Sweetie"
 
 # ▶ 성격 선택 화면 (초기 1회)
-if st.session_state.personality is None:
-    st.subheader("🤖 AI 성격을 골라주세요!")
-    selected = st.radio("원하는 성격을 선택하세요:", ["Sweetie", "Lover", "Strictly", "twisted", "Ignore"])
-    if st.button("선택 완료"):
-        st.session_state.personality = selected
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": f"안녕하세요! {selected}한 AI입니다. 무엇을 도와드릴까요?"
-        })
-        st.rerun()
-    st.stop()
+# if st.session_state.personality is None:
+#     st.subheader("🤖 AI 성격을 골라주세요!")
+#     selected = st.radio("원하는 성격을 선택하세요:", ["Sweetie", "Lover", "Strictly", "twisted", "Ignore"])
+#     if st.button("선택 완료"):
+#         st.session_state.personality = selected
+#         st.session_state.messages.append({
+#             "role": "assistant",
+#             "content": f"안녕하세요! {selected}한 AI입니다. 무엇을 도와드릴까요?"
+#         })
+#         st.rerun()
+#     st.stop()
+
+# 드롭다운으로 성격 선택 가능하게
+personality_list = list(system_prompts.keys())
+
+selected = st.selectbox("🤖 현재 AI 성격 : ", personality_list, 
+                        index=personality_list.index(st.session_state.personality))
+
+#성격 변경 감지
+if selected != st.session_state.personality:
+    st.session_state.personality = selected
+    st.session_state.messages.append({
+        "role": "assistant",
+        "conetent": f"성격이 {selected}으로 바뀌었습니다."
+    })
+
+
 
 # 대화 기록 출력
 for message in st.session_state.messages:
