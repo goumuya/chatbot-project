@@ -70,9 +70,13 @@ if selected != st.session_state.personality:
 
 
 # 대화 기록 출력
+# for message in st.session_state.messages:
+#     with st.chat_message(message["role"]):
+#         st.markdown(message["content"])
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+    if "role" in message and "content" in message:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
 # 사용자 입력 받기
 user_input = st.chat_input("메시지를 입력하세요.")
