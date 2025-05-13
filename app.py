@@ -2,6 +2,11 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
+from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
+import numpy as np
+import tempfile
+import soundfile as sf
+import av
 
 # .env 파일에서 API 키 로드
 load_dotenv()
@@ -12,6 +17,16 @@ client = OpenAI(
     api_key=st.secrets["OPENAI_PAID_API_KEY"],
     #base_url="https://api.groq.com/openai/v1"
 )
+
+# 마이크 처리 클래스
+class AudioProcessor(AudioProcessorBase):
+    def __init__(self):
+        self.recorded_frames = []
+
+    def recv(self, frame: av.AudioFrame):
+        audio = frame.to_ndarray().flatten().astype(np.int16)
+        self.recorded_frames.append(audio)
+        return frame
 
 # Streamlit 기본 설정
 st.set_page_config(page_title="🧠 말동무 챗봇 연습용", page_icon="💬")
@@ -85,6 +100,30 @@ for message in st.session_state.messages:
     if "role" in message and "content" in message:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+
+# 🎤 실시간 마이크 입력
+st.markdown("## 🎤 또는 마이크로 말해보세요")
+ctx = webrtc_streamer(
+    key="speech",
+    audio_processor_factory=AudioProcessor,
+    media_stream_constraints={"audio": True, "video": False},
+    async_processing=True,
+)
+
+user_input = None
+if ctx.audio_processor and st.button("📝 말한 내용으로 질문하기"):
+    audio_data = np.concatenate(ctx.audio_processor.recorded_frames)
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmpfile:
+        sf.write(tmpfile.name, audio_data, 48000)
+        with open(tmpfile.name, "rb") as f:
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=f,
+                language="ko"
+            )
+            user_input = transcript.text
+            st.chat_message("user").markdown(user_input)
+            st.session_state.messages.append({"role": "user", "content": user_input})            
 
 # 사용자 입력 받기
 user_input = st.chat_input("메시지를 입력하세요.")
