@@ -14,15 +14,15 @@ client = OpenAI(
 )
 
 # Streamlit 기본 설정
-st.set_page_config(page_title="🧠 김현수 챗봇 갖다붙이기 연습용", page_icon="💬")
-st.title("🧠 Gemma2-9B-it 모델 API 챗봇")
+st.set_page_config(page_title="🧠 말동무 챗봇 연습용", page_icon="💬")
+st.title("🧠 심심풀이 말동무 챗봇")
 st.markdown("""
 # 👋 환영합니다!
-이곳은 챗봇 서비스입니다. \n
-아래 입력창에 질문을 입력해보세요!\n
-한국어가 서툴러서 오타 혹은 갑작스런 언어변경이 종종 발생합니다.
+이곳은 말동무 챗봇 서비스입니다. \n
+성격을 고르고, 아래 입력창에서 간단한 수다를 즐겨보세요!\n
 """)
-st.caption("김현수 물어봐도 모름 / 한국어 서툼")
+#st.caption("김현수 물어봐도 모름 / 한국어 서툼")
+st.caption("김현수 물어봐도 모릅니다.ㅠ")
 
 # ▶ 성격 프롬프트 사전
 system_prompts = {
@@ -56,8 +56,12 @@ if "personality" not in st.session_state:
 # 드롭다운으로 성격 선택 가능하게
 personality_list = list(system_prompts.keys())
 
-selected = st.selectbox("🤖 현재 AI 성격 : ", personality_list, 
-                        index=personality_list.index(st.session_state.personality))
+with st.sidebar:
+    st.markdown("## 🤖 AI 성격 설정")
+    selected = st.selectbox("현재 성격을 선택하세요", personality_list,
+                            index=personality_list.index(st.session_state.personality))
+# selected = st.selectbox("🤖 현재 AI 성격 : ", personality_list, 
+#                         index=personality_list.index(st.session_state.personality))
 
 #성격 변경 감지
 if selected != st.session_state.personality:
