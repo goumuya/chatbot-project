@@ -19,11 +19,14 @@ client = OpenAI(
 class AudioProcessor(AudioProcessorBase):
     def __init__(self):
         self.recorded_frames = []
+        self.volume = 0
 
-    def recv(self, frame: av.AudioFrame):
-        audio = frame.to_ndarray().flatten().astype(np.int16)
-        self.recorded_frames.append(audio)
-        return frame
+    def recv_queued(self, frames):
+        for frame in frames:
+            audio = frame.to_ndarray().flatten().astype(np.int16)
+            self.recorded_frames.append(audio)
+            self.volume = int(np.linalg.norm(audio) / len(audio) * 10)
+        return frames[-1]
 
 # Streamlit 기본 설정
 st.set_page_config(page_title="🧠 말동무 챗봇 연습용", page_icon="💬")
@@ -81,6 +84,8 @@ for message in st.session_state.messages:
 st.markdown("## 🎤 마이크 입력")
 st.session_state.mic_on = st.toggle("🎙 마이크 켜기 / 끄기", value=st.session_state.mic_on)
 
+user_input = None
+
 if st.session_state.mic_on:
     st.success("🔴 마이크가 켜졌습니다. 말을 시작하세요.")
     ctx = webrtc_streamer(
@@ -90,19 +95,33 @@ if st.session_state.mic_on:
         async_processing=True,
     )
 
-    if ctx.audio_processor and st.button("📝 말한 내용으로 질문하기"):
-        audio_data = np.concatenate(ctx.audio_processor.recorded_frames)
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmpfile:
-            sf.write(tmpfile.name, audio_data, 48000)
-            with open(tmpfile.name, "rb") as f:
-                transcript = client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=f,
-                    language="ko"
-                )
-                user_input = transcript.text
-                st.chat_message("user").markdown(user_input)
-                st.session_state.messages.append({"role": "user", "content": user_input})
+    if ctx.audio_processor:
+        level = ctx.audio_processor.volume
+        bar = "🔊" * level + "▫️" * (10 - level)
+        st.markdown(f"**소리 입력 상태:** {bar}")
+
+        if st.button("📝 말한 내용으로 질문하기"):
+            if ctx.audio_processor.recorded_frames:
+                audio_data = np.concatenate(ctx.audio_processor.recorded_frames)
+                audio_duration = len(audio_data) / 48000
+
+                if audio_duration < 0.1:
+                    st.warning("⚠️ 음성 길이가 너무 짧습니다. 좀 더 길게 말해보세요.")
+                else:
+                    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmpfile:
+                        sf.write(tmpfile.name, audio_data, 48000)
+
+                        with open(tmpfile.name, "rb") as f:
+                            transcript = client.audio.transcriptions.create(
+                                model="whisper-1",
+                                file=f,
+                                language="ko"
+                            )
+                            user_input = transcript.text
+                            st.chat_message("user").markdown(user_input)
+                            st.session_state.messages.append({"role": "user", "content": user_input})
+            else:
+                st.warning("⚠️ 아직 음성이 입력되지 않았습니다. 말을 하고 나서 다시 눌러주세요.")
 else:
     ctx = None
 
@@ -112,8 +131,6 @@ if text_input:
     user_input = text_input
     st.chat_message("user").markdown(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
-else:
-    user_input = None
 
 # GPT 응답 생성
 if user_input:
