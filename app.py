@@ -64,7 +64,7 @@ if selected != st.session_state.personality:
     st.session_state.personality = selected
     st.session_state.messages.append({
         "role": "assistant",
-        "conetent": f"성격이 {selected}으로 바뀌었습니다."
+        "content": f"성격이 {selected}으로 바뀌었습니다."
     })
 
 
@@ -91,6 +91,12 @@ if user_input:
     assistant_response = assistant_message.empty()
 
     full_reply = ""
+
+    #필터링 된 메시지만 따로 만들어서 사용
+    valid_messages = [
+        msg for msg in st.session_state.messages
+        if isinstance(msg, dict) and "role" in msg and "content" in msg
+    ]
 
     # 스트리밍 응답 받기
     response = client.chat.completions.create(
