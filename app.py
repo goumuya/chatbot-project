@@ -7,8 +7,9 @@ from openai import OpenAI
 load_dotenv()
 
 client = OpenAI(
-    api_key=os.getenv("GROQ_API_KEY"),
-    base_url="https://api.groq.com/openai/v1"
+    #api_key=os.getenv("GROQ_API_KEY"),
+    api_key=os.getenv("OPENAI_PAID_API_KEY"),
+    #base_url="https://api.groq.com/openai/v1"
 )
 
 # Streamlit 기본 설정
@@ -72,10 +73,10 @@ if user_input:
 
     # 스트리밍 응답 받기
     response = client.chat.completions.create(
-        #model = "gpt-4o",
+        model = "gpt-4o",
         #model = "gpt-3.5-turbo",
         #model = "llama3-70b-8192", # Groq 모델
-        model = "gemma2-9b-it",
+        #model = "gemma2-9b-it",
         messages=[{"role": "system", "content": system_prompts[st.session_state.personality]}] + st.session_state.messages,
         stream=True # 스트리밍 활성화
     )
