@@ -2,11 +2,6 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
-from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
-import numpy as np
-import tempfile
-import soundfile as sf
-import av
 
 # .env 파일에서 API 키 로드
 load_dotenv()
@@ -14,19 +9,6 @@ load_dotenv()
 client = OpenAI(
     api_key=st.secrets["OPENAI_PAID_API_KEY"]
 )
-
-# 마이크 처리 클래스
-class AudioProcessor(AudioProcessorBase):
-    def __init__(self):
-        self.recorded_frames = []
-        self.volume = 0
-
-    def recv_queued(self, frames):
-        for frame in frames:
-            audio = frame.to_ndarray().flatten().astype(np.int16)
-            self.recorded_frames.append(audio)
-            self.volume = int(np.linalg.norm(audio) / len(audio) * 10)
-        return frames[-1]
 
 # Streamlit 기본 설정
 st.set_page_config(page_title="🧠 말동무 챗봇 연습용", page_icon="💬")
@@ -52,8 +34,6 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "personality" not in st.session_state:
     st.session_state.personality = "Sweetie"
-if "mic_on" not in st.session_state:
-    st.session_state.mic_on = False
 
 # 드롭다운으로 성격 선택 가능하게
 personality_list = list(system_prompts.keys())
@@ -80,50 +60,7 @@ for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-# 🎤 마이크 on/off 토글 및 표시
-st.markdown("## 🎤 마이크 입력")
-st.session_state.mic_on = st.toggle("🎙 마이크 켜기 / 끄기", value=st.session_state.mic_on)
-
 user_input = None
-
-if st.session_state.mic_on:
-    st.success("🔴 마이크가 켜졌습니다. 말을 시작하세요.")
-    ctx = webrtc_streamer(
-        key="speech",
-        audio_processor_factory=AudioProcessor,
-        media_stream_constraints={"audio": True, "video": False},
-        async_processing=True,
-    )
-
-    if ctx.audio_processor:
-        level = ctx.audio_processor.volume
-        bar = "🔊" * level + "▫️" * (10 - level)
-        st.markdown(f"**소리 입력 상태:** {bar}")
-
-        if st.button("📝 말한 내용으로 질문하기"):
-            if ctx.audio_processor.recorded_frames:
-                audio_data = np.concatenate(ctx.audio_processor.recorded_frames)
-                audio_duration = len(audio_data) / 48000
-
-                if audio_duration < 0.1:
-                    st.warning("⚠️ 음성 길이가 너무 짧습니다. 좀 더 길게 말해보세요.")
-                else:
-                    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmpfile:
-                        sf.write(tmpfile.name, audio_data, 48000)
-
-                        with open(tmpfile.name, "rb") as f:
-                            transcript = client.audio.transcriptions.create(
-                                model="whisper-1",
-                                file=f,
-                                language="ko"
-                            )
-                            user_input = transcript.text
-                            st.chat_message("user").markdown(user_input)
-                            st.session_state.messages.append({"role": "user", "content": user_input})
-            else:
-                st.warning("⚠️ 아직 음성이 입력되지 않았습니다. 말을 하고 나서 다시 눌러주세요.")
-else:
-    ctx = None
 
 # 사용자 입력 받기
 text_input = st.chat_input("메시지를 입력하세요.")
