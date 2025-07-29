@@ -1,4 +1,5 @@
 import os
+import json
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -89,6 +90,20 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
+# 대화 기록 저장
+def save_dialogue_to_file(dialogue, filename="chat_log.json"):
+    if os.path.exists(filename):
+        with open(filename, "r", encoding="utf-8") as f:
+            logs = json.load(f)
+    else:
+        logs = []
+
+    logs.append(dialogue)
+
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(logs, f, ensure_ascii=False, indent=2)
+
+
 # 성격 변경 감지
 selected = personality_labels[st.session_state.selected_label]
 if selected != st.session_state.personality:
@@ -157,6 +172,12 @@ if user_input:
 
     # 6. 응답 메시지 세션에 저장
     st.session_state.messages.append({"role": "assistant", "content": full_reply})
+
+    # 6.1 대화기록 파일 저장
+    save_dialogue_to_file({
+        "user":user_input,
+        "assistant": full_reply
+    })
 
     # 7. 새로고침으로 출력 정리
     st.rerun()
