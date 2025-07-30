@@ -76,6 +76,10 @@ if "personality" not in st.session_state:
     st.session_state.personality = "Sweetie"
 if "selected_label" not in st.session_state:
     st.session_state.selected_label = [k for k, v in personality_labels.items() if v == st.session_state.personality][0]
+if "prev_compare_mode" not in st.session_state:
+    st.session_state.prev_compare_mode = False
+if "compare_input_cache" not in st.session_state:
+    st.session_state.compare_input_cache = None
 
 # 사이드바 UI
 with st.sidebar:
@@ -86,6 +90,15 @@ with st.sidebar:
         index=list(personality_labels.keys()).index(st.session_state.selected_label),
         key="selected_label"
     )
+
+    compare_mode = st.checkbox("📊 성격별 응답 비교 모드", value=False)
+
+    # 비교모드 해제 감지 시 메시지 초기화
+    if st.session_state.prev_compare_mode and not compare_mode:
+       st.session_state.compare_input_cache = None
+
+    st.session_state.prev_compare_mode = compare_mode
+
     if st.button("💬 대화 리셋"):
         st.session_state.messages = []
         st.rerun()
@@ -118,23 +131,87 @@ user_input = st.chat_input("메시지를 입력하세요.")
 
 # 사용자가 입력한 경우
 if user_input:
-    # 1. 사용자 메시지를 세션에 추가
-    st.session_state.messages.append({"role": "user", "content": user_input})
+    if compare_mode:
+        # 비교 모드일 경우 세션 messages에 추가하지 않음
+        st.session_state.compare_input_cache = user_input
+    else:
+        # 일반 모드일 경우에만 메시지를 세션에 추가
+        st.session_state.messages.append({"role": "user", "content": user_input})
 
-    # 2. 지금까지의 메시지 출력
-    for message in st.session_state.messages:
-        align = "flex-end" if message["role"] == "user" else "flex-start"
-        css_class = "user-message" if message["role"] == "user" else "assistant-message"
-        st.markdown(
-            f"""
-            <div class="chat-container" style="justify-content: {align};">
-                <div class="{css_class}">{message['content']}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
+    # 지금까지의 메시지 출력
+    if compare_mode:
+        # 비교모드일 경우, 마지막 메시지만 출력
+        if st.session_state.compare_input_cache:
+            st.markdown(
+                f"""
+                <div class="chat-container" style="justify-content: flex-end;">
+                    <div class="user-message">{st.session_state.compare_input_cache}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    else:
+        # 일반 모드일 경우 전체 출력
+        for message in st.session_state.messages:
+            align = "flex-end" if message["role"] == "user" else "flex-start"
+            css_class = "user-message" if message["role"] == "user" else "assistant-message"
+            st.markdown(
+                f"""
+                <div class="chat-container" style="justify-content: {align};">
+                    <div class="{css_class}">{message['content']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+     # 비교모드인 경우
+    if user_input and compare_mode:
+        st.session_state.compare_input_cache = user_input
+        st.markdown("### 🤖 성격별 응답 비교")
+
+        responses = {}
+
+        for label, prompt_key in personality_labels.items():
+            system_message = {"role": "system", "content": system_prompts[prompt_key]}
+            messages = [system_message, {"role": "user", "content": user_input}]
+
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages
+            )
+
+            reply = response.choices[0].message.content
+            responses[label] = reply
+
+            st.markdown(f"### 🧠 {label} 스타일")
+            st.info(reply)
+            
+        
+        # 기록 저장
+        save_dialogue_to_file({
+            "mode": "비교모드",
+            "user": user_input,
+            "response": responses
+        })
+
+        # 대화기록 다운로드
+        compare_log_json = json.dumps({
+            "mode": "비교모드",
+            "user": user_input,
+            "response": responses
+        }, ensure_ascii=False, indent=2)
+
+        # 다운로드버튼
+        st.download_button(
+            label="💾 비교모드 응답 다운로드",
+            data=compare_log_json,
+            file_name="compare_mode_log.json",
+            mime="application/json"
         )
 
-    # 3. GPT 응답 생성 (타이핑 효과 포함)
+        st.stop() # 비교모드에서는 이 후 코드 중단
+
+    # GPT 응답 생성 (타이핑 효과 포함)
     full_reply = ""
     valid_messages = [
         msg for msg in st.session_state.messages
@@ -146,7 +223,7 @@ if user_input:
         stream=True
     )
 
-    # 4. 타자치는 UI 표시
+    # 타자치는 UI 표시
     placeholder = st.empty()
     for chunk in response:
         if chunk.choices[0].delta.content:
@@ -160,7 +237,7 @@ if user_input:
                 unsafe_allow_html=True
             )
 
-    # 5. 최종 응답 표시 (커서 제거)
+    # 최종 응답 표시 (커서 제거)
     placeholder.markdown(
         f"""
         <div class="chat-container" style="justify-content: flex-start;">
@@ -170,16 +247,16 @@ if user_input:
         unsafe_allow_html=True
     )
 
-    # 6. 응답 메시지 세션에 저장
+    # 응답 메시지 세션에 저장
     st.session_state.messages.append({"role": "assistant", "content": full_reply})
 
-    # 6.1 대화기록 파일 저장
+    # 대화기록 파일 저장
     save_dialogue_to_file({
         "user":user_input,
         "assistant": full_reply
     })
 
-    # 7. 새로고침으로 출력 정리
+    # 새로고침으로 출력 정리
     st.rerun()
 
 # 입력이 없을 때 (처음 접속하거나 입력 대기 상태)
@@ -195,3 +272,13 @@ else:
             """,
             unsafe_allow_html=True
         )
+
+# 대화 로그 다운로드
+chat_log_json = json.dumps(st.session_state.messages, ensure_ascii=False, indent=2)
+
+st.download_button(
+    label="💾 대화 로그 다운로드",
+    data=chat_log_json,
+    file_name="chat_log.json",
+    mime="application/json"
+)
