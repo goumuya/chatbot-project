@@ -1,3 +1,4 @@
 .env
 .streamlit/
-.stremalit/secrets.toml
+.streamlit/secrets.toml
+chatbot-project-467708-f1c28f1e95cc.json
