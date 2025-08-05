@@ -1,5 +1,6 @@
 import os
 import json
+import sqlite3
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -116,6 +117,56 @@ def save_dialogue_to_file(dialogue, filename="chat_log.json"):
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(logs, f, ensure_ascii=False, indent=2)
 
+# 대화 기록 DB 저장
+def save_message_to_db(role, content, label=None):
+    conn = sqlite3.connect("chat_log.db")
+    cursor = conn.cursor()
+
+    # 테이블 생성
+    cursor.execute(""" 
+        CREATE TABLE IF NOT EXISTS normal_logs (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   user TEXT NOT NULL,
+                   character TEXT NOT NULL,
+                   assistant TEXT NOT NULL,
+                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute(""" 
+        CREATE TABLE IF NOT EXISTS compare_logs (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   user TEXT NOT NULL,
+                   character TEXT NOT NULL,
+                   assistant TEXT NOT NULL,
+                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    if role == "assistant":
+        # 직전 user message와 assistant message 저장
+        if len(st.session_state.messages) >= 2:
+            user_msg = st.session_state.messages[-2]["content"]
+            try:
+                cursor.execute(
+                    "INSERT INTO normal_logs (user, character, assistant) VALUES (?, ?, ?)",
+                    (user_msg, st.session_state.selected_label, content)
+                )
+            except Exception as e:
+                print("DB 저장 실패 : ", e)
+    elif role == "compare":
+        user_msg = st.session_state.get("compare_input_cache", "")
+        try:
+            for label, resp in content.items():
+                cursor.execute(
+                    "INSERT INTO compare_logs (user, character, assistant) VALUES (?, ?, ?)",
+                    (user_msg, label, resp)
+                )
+        except Exception as e:
+            print("비교모드 DB저장 실패 : ", e)
+
+    conn.commit()
+    conn.close()
+
 
 # 성격 변경 감지
 selected = personality_labels[st.session_state.selected_label]
@@ -165,7 +216,7 @@ if user_input:
             )
 
      # 비교모드인 경우
-    if user_input and compare_mode:
+    if compare_mode:
         st.session_state.compare_input_cache = user_input
         st.markdown("### 🤖 성격별 응답 비교")
 
@@ -209,6 +260,9 @@ if user_input:
             mime="application/json"
         )
 
+        # 비교 모드 대답 DB저장
+        save_message_to_db("compare", responses)
+
         st.stop() # 비교모드에서는 이 후 코드 중단
 
     # GPT 응답 생성 (타이핑 효과 포함)
@@ -249,10 +303,13 @@ if user_input:
 
     # 응답 메시지 세션에 저장
     st.session_state.messages.append({"role": "assistant", "content": full_reply})
+    # 대화 DB저장
+    save_message_to_db("assistant", full_reply)
 
     # 대화기록 파일 저장
     save_dialogue_to_file({
         "user":user_input,
+        "character": st.session_state.selected_label,
         "assistant": full_reply
     })
 

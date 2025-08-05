@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DdlMappings">
+    <mapping uuid="586baac9-1804-45c3-9fd2-57aff8ac1988" name="chat_log Mapping">
+      <data-sources db="45b3b13f-9690-4c17-9707-d9be5a45e711" />
+    </mapping>
+  </component>
+</project>
